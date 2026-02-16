@@ -1,0 +1,9 @@
+# Flutter / Dart
+.dart_tool/
+build/
+
+# Android / Gradle
+android/.gradle/
+android/local.properties
+**/*.iml
+.gradle/
