@@ -30,7 +30,8 @@ class StorageService {
   }
 
   static List<Reminder> getAllReminders() {
-    return _reminderBox.values.toList()..sort((a, b) => a.time.compareTo(b.time));
+    return _reminderBox.values.toList()
+      ..sort((a, b) => a.time.compareTo(b.time));
   }
 
   static Reminder? getReminder(String id) {
@@ -61,16 +62,15 @@ class StorageService {
     await _medicineDoseBox.put(dose.storageKey, dose);
   }
 
-  static MedicineDose? getMedicineDose(String medicineId, String date, String time) {
+  static MedicineDose? getMedicineDose(
+      String medicineId, String date, String time) {
     final key = 'dose_${medicineId}_${date}_$time';
     return _medicineDoseBox.get(key);
   }
 
   static List<MedicineDose> getTodayDoses() {
     final today = AppDateUtils.getTodayKey();
-    return _medicineDoseBox.values
-        .where((dose) => dose.date == today)
-        .toList();
+    return _medicineDoseBox.values.where((dose) => dose.date == today).toList();
   }
 
   static List<MedicineDose> getDosesForMedicine(String medicineId) {
@@ -84,16 +84,75 @@ class StorageService {
     final List<MedicineDose> result = [];
     for (var date in days) {
       final dateKey = AppDateUtils.getDateKey(date);
-      result.addAll(
-        _medicineDoseBox.values.where((dose) => dose.date == dateKey).toList()
-      );
+      result.addAll(_medicineDoseBox.values
+          .where((dose) => dose.date == dateKey)
+          .toList());
     }
     return result;
   }
 
+  static bool _isReminderActiveOnDate(Reminder reminder, DateTime date) {
+    final day = DateTime(date.year, date.month, date.day);
+    final start = DateTime(
+      reminder.startDate.year,
+      reminder.startDate.month,
+      reminder.startDate.day,
+    );
+    if (day.isBefore(start)) return false;
+
+    final end = reminder.effectiveEndDate;
+    if (end == null) return true;
+
+    final endDay = DateTime(end.year, end.month, end.day);
+    return !day.isAfter(endDay);
+  }
+
+  static Set<String> _expectedDoseKeysForDate(DateTime date) {
+    final dateKey = AppDateUtils.getDateKey(date);
+    final keys = <String>{};
+    for (final reminder in getAllReminders()) {
+      if (!_isReminderActiveOnDate(reminder, date)) continue;
+      for (final medicine in reminder.medicines) {
+        keys.add('dose_${medicine.id}_${dateKey}_${reminder.time}');
+      }
+    }
+    return keys;
+  }
+
+  static int calculateExpectedDays() {
+    final days = AppDateUtils.getLast30Days();
+    var expectedDays = 0;
+    for (final date in days) {
+      if (_expectedDoseKeysForDate(date).isNotEmpty) {
+        expectedDays += 1;
+      }
+    }
+    return expectedDays;
+  }
+
   static int calculateAdherence() {
-    final doses = getLast30Days();
-    return doses.where((d) => d.isTaken).length;
+    final days = AppDateUtils.getLast30Days();
+    var adheredDays = 0;
+
+    for (final date in days) {
+      final expectedKeys = _expectedDoseKeysForDate(date);
+      if (expectedKeys.isEmpty) continue;
+
+      var allTaken = true;
+      for (final key in expectedKeys) {
+        final dose = _medicineDoseBox.get(key);
+        if (dose == null || !dose.isTaken) {
+          allTaken = false;
+          break;
+        }
+      }
+
+      if (allTaken) {
+        adheredDays += 1;
+      }
+    }
+
+    return adheredDays;
   }
 
   static String generateShareText() {
@@ -101,37 +160,100 @@ class StorageService {
     if (reminders.isEmpty) {
       return 'No medicines added yet';
     }
-    
+
     final StringBuffer buffer = StringBuffer();
     buffer.writeln('Medication Report');
     buffer.writeln('----------------');
-    
+
     for (var reminder in reminders) {
       for (var medicine in reminder.medicines) {
         final adherence = calculateMedicineAdherence(medicine.id);
-        final percentage = ((adherence / AppConstants.historyDays) * 100).round();
-        buffer.writeln('${medicine.name} (${medicine.dose} ${medicine.unit}): $adherence/${AppConstants.historyDays} days ($percentage%)');
+        final expectedDays = calculateExpectedMedicineDays(medicine.id);
+        final percentage =
+            expectedDays == 0 ? 0 : ((adherence / expectedDays) * 100).round();
+        buffer.writeln(
+            '${medicine.name} (${medicine.dose} ${medicine.unit}): $adherence/$expectedDays days ($percentage%)');
       }
     }
-    
+
     return buffer.toString();
   }
 
   static int calculateMedicineAdherence(String medicineId) {
-    final doses = getDosesForMedicine(medicineId);
     final last30Days = AppDateUtils.getLast30Days();
-    final dateKeys = last30Days.map((d) => AppDateUtils.getDateKey(d)).toSet();
-    
-    final relevantDoses = doses.where((d) => dateKeys.contains(d.date)).toList();
-    return relevantDoses.where((d) => d.isTaken).length;
+
+    var adheredDays = 0;
+    for (final date in last30Days) {
+      final dateKey = AppDateUtils.getDateKey(date);
+      final expectedKeys = <String>{};
+
+      for (final reminder in getAllReminders()) {
+        if (!_isReminderActiveOnDate(reminder, date)) continue;
+        for (final medicine in reminder.medicines) {
+          if (medicine.id == medicineId) {
+            expectedKeys.add('dose_${medicineId}_${dateKey}_${reminder.time}');
+          }
+        }
+      }
+
+      if (expectedKeys.isEmpty) continue;
+
+      var allTaken = true;
+      for (final key in expectedKeys) {
+        final dose = _medicineDoseBox.get(key);
+        if (dose == null || !dose.isTaken) {
+          allTaken = false;
+          break;
+        }
+      }
+
+      if (allTaken) {
+        adheredDays += 1;
+      }
+    }
+
+    return adheredDays;
   }
 
-  static int getLockoutHours() {
-    return _prefs.getInt(AppConstants.lockoutHoursKey) ?? AppConstants.defaultLockoutHours;
+  static int calculateExpectedMedicineDays(String medicineId) {
+    final last30Days = AppDateUtils.getLast30Days();
+    var expectedDays = 0;
+
+    for (final date in last30Days) {
+      var hasAny = false;
+      for (final reminder in getAllReminders()) {
+        if (!_isReminderActiveOnDate(reminder, date)) continue;
+        if (reminder.medicines.any((m) => m.id == medicineId)) {
+          hasAny = true;
+          break;
+        }
+      }
+      if (hasAny) {
+        expectedDays += 1;
+      }
+    }
+
+    return expectedDays;
   }
 
-  static Future<void> setLockoutHours(int hours) async {
-    await _prefs.setInt(AppConstants.lockoutHoursKey, hours);
+  static int getLockoutMinutes() {
+    final minutes = _prefs.getInt(AppConstants.lockoutMinutesKey);
+    if (minutes != null) return minutes;
+
+    // Migrate legacy hours value if present.
+    final legacyHours = _prefs.getInt(AppConstants.lockoutHoursKey);
+    if (legacyHours != null) {
+      final migrated = legacyHours * 60;
+      // ignore: unawaited_futures
+      _prefs.setInt(AppConstants.lockoutMinutesKey, migrated);
+      return migrated;
+    }
+
+    return AppConstants.defaultLockoutMinutes;
+  }
+
+  static Future<void> setLockoutMinutes(int minutes) async {
+    await _prefs.setInt(AppConstants.lockoutMinutesKey, minutes);
   }
 
   static bool getReminderEnabled() {
@@ -143,7 +265,8 @@ class StorageService {
   }
 
   static String getReminderTime() {
-    return _prefs.getString(AppConstants.reminderTimeKey) ?? AppConstants.defaultReminderTime;
+    return _prefs.getString(AppConstants.reminderTimeKey) ??
+        AppConstants.defaultReminderTime;
   }
 
   static Future<void> setReminderTime(String time) async {

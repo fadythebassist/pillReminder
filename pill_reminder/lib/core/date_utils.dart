@@ -57,10 +57,10 @@ class AppDateUtils {
     });
   }
 
-  static bool isInLockout(DateTime? takenAt, int lockoutHours) {
+  static bool isInLockout(DateTime? takenAt, int lockoutMinutes) {
     if (takenAt == null) return false;
     final now = DateTime.now();
-    final lockoutEnd = takenAt.add(Duration(hours: lockoutHours));
+    final lockoutEnd = takenAt.add(Duration(minutes: lockoutMinutes));
     return now.isBefore(lockoutEnd) || now.isAtSameMomentAs(lockoutEnd);
   }
 }

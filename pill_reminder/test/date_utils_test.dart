@@ -16,7 +16,8 @@ void main() {
 
     test('getTodayKey returns today date key', () {
       final today = DateTime.now();
-      final expected = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+      final expected =
+          '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
       expect(AppDateUtils.getTodayKey(), expected);
     });
 
@@ -80,37 +81,38 @@ void main() {
 
   group('Lockout Logic Tests', () {
     test('isInLockout returns false when takenAt is null', () {
-      expect(AppDateUtils.isInLockout(null, 4), false);
+      expect(AppDateUtils.isInLockout(null, 240), false);
     });
 
     test('isInLockout returns false after lockout period', () {
       final takenAt = DateTime.now().subtract(const Duration(hours: 5));
-      expect(AppDateUtils.isInLockout(takenAt, 4), false);
+      expect(AppDateUtils.isInLockout(takenAt, 240), false);
     });
 
     test('isInLockout returns true during lockout period', () {
       final takenAt = DateTime.now().subtract(const Duration(hours: 2));
-      expect(AppDateUtils.isInLockout(takenAt, 4), true);
+      expect(AppDateUtils.isInLockout(takenAt, 240), true);
     });
 
     test('isInLockout returns true at exactly lockout end', () {
       final takenAt = DateTime.now().subtract(const Duration(hours: 4));
-      expect(AppDateUtils.isInLockout(takenAt, 4), true);
+      expect(AppDateUtils.isInLockout(takenAt, 240), true);
     });
 
     test('isInLockout returns false just after lockout end', () {
-      final takenAt = DateTime.now().subtract(const Duration(hours: 4, minutes: 1));
-      expect(AppDateUtils.isInLockout(takenAt, 4), false);
+      final takenAt =
+          DateTime.now().subtract(const Duration(hours: 4, minutes: 1));
+      expect(AppDateUtils.isInLockout(takenAt, 240), false);
     });
 
     test('isInLockout works with 1 hour lockout', () {
       final takenAt = DateTime.now().subtract(const Duration(minutes: 30));
-      expect(AppDateUtils.isInLockout(takenAt, 1), true);
+      expect(AppDateUtils.isInLockout(takenAt, 60), true);
     });
 
     test('isInLockout works with 8 hour lockout', () {
       final takenAt = DateTime.now().subtract(const Duration(hours: 6));
-      expect(AppDateUtils.isInLockout(takenAt, 8), true);
+      expect(AppDateUtils.isInLockout(takenAt, 480), true);
     });
   });
 
@@ -120,14 +122,14 @@ void main() {
     });
 
     test('Default lockout hours is 4', () {
-      expect(AppConstants.defaultLockoutHours, 4);
+      expect(AppConstants.defaultLockoutMinutes, 240);
     });
 
     test('Lockout options include expected values', () {
-      expect(AppConstants.lockoutOptions, contains(1));
-      expect(AppConstants.lockoutOptions, contains(2));
-      expect(AppConstants.lockoutOptions, contains(4));
-      expect(AppConstants.lockoutOptions, contains(8));
+      expect(AppConstants.lockoutPresetMinutes, contains(60));
+      expect(AppConstants.lockoutPresetMinutes, contains(120));
+      expect(AppConstants.lockoutPresetMinutes, contains(240));
+      expect(AppConstants.lockoutPresetMinutes, contains(480));
     });
   });
 }

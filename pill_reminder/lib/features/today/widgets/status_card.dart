@@ -13,16 +13,19 @@ class StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final cardColor = isTaken ? scheme.tertiary : scheme.error;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isTaken ? const Color(0xFF66BB6A) : const Color(0xFFEF5350),
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: (isTaken ? const Color(0xFF66BB6A) : const Color(0xFFEF5350))
-                .withValues(alpha: 0.3),
+            color: cardColor.withValues(alpha: 0.25),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -39,21 +42,19 @@ class StatusCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             isTaken ? 'TAKEN' : 'NOT TAKEN',
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
+            style: textTheme.headlineSmall?.copyWith(
               color: Colors.white,
-              letterSpacing: 2,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
             ),
           ),
           if (isTaken && takenAt != null) ...[
             const SizedBox(height: 8),
             Text(
               'at ${AppDateUtils.formatTime(takenAt!)}',
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w500,
+              style: textTheme.titleLarge?.copyWith(
                 color: Colors.white,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],

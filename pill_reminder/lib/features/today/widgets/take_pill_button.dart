@@ -12,27 +12,28 @@ class TakePillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return SizedBox(
       width: double.infinity,
       height: 64,
-      child: ElevatedButton(
+      child: FilledButton(
         onPressed: isEnabled ? onPressed : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF1976D2),
-          disabledBackgroundColor: Colors.grey.shade400,
+        style: FilledButton.styleFrom(
+          backgroundColor: scheme.primary,
           foregroundColor: Colors.white,
-          disabledForegroundColor: Colors.white70,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          elevation: isEnabled ? 4 : 0,
+          disabledBackgroundColor: scheme.onSurface.withValues(alpha: 0.20),
+          disabledForegroundColor: Colors.white.withValues(alpha: 0.70),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
-        child: const Text(
+        child: Text(
           'I TOOK MY PILL',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1,
+          style: textTheme.titleMedium?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.8,
           ),
         ),
       ),

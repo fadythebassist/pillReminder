@@ -2,8 +2,33 @@
 .dart_tool/
 build/
 
+# Local agent instructions
+AGENTS.md
+
+# Flutter-generated plugin files
+.flutter-plugins
+.flutter-plugins-dependencies
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
 # Android / Gradle
-android/.gradle/
-android/local.properties
+**/android/.gradle/
+**/android/local.properties
+**/android/key.properties
+**/*.jks
+**/*.keystore
 **/*.iml
 .gradle/
+
+# IDE
+.idea/
+**/.idea/
+.vscode/
+
+# Python caches (tools)
+**/__pycache__/
+*.pyc
+
+# OS junk
+.DS_Store
+Thumbs.db

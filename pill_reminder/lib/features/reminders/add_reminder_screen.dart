@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants.dart';
 import '../../core/services/notification_service.dart';
 import '../../models/reminder.dart';
 import '../../providers/app_providers.dart';
+import '../../widgets/app_background.dart';
 
 class AddReminderScreen extends ConsumerStatefulWidget {
   final Reminder? reminder;
@@ -16,7 +18,12 @@ class AddReminderScreen extends ConsumerStatefulWidget {
 class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
   final _formKey = GlobalKey<FormState>();
   TimeOfDay _selectedTime = const TimeOfDay(hour: 8, minute: 0);
+  final List<TimeOfDay> _selectedTimes = [];
   List<MedicineFormData> _medicines = [];
+
+  // When editing an existing reminder, keep track of which selected time
+  // represents the reminder being edited (by its original HH:mm key).
+  String? _editingBaseTimeKey;
 
   ReminderScheduleType _scheduleType = ReminderScheduleType.dailyForever;
   DateTime _startDate = _todayLocalDate();
@@ -36,12 +43,20 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
         hour: int.parse(widget.reminder!.time.split(':')[0]),
         minute: int.parse(widget.reminder!.time.split(':')[1]),
       );
-      _medicines = widget.reminder!.medicines.map((m) => MedicineFormData(
-        id: m.id,
-        nameController: TextEditingController(text: m.name),
-        doseController: TextEditingController(text: m.dose),
-        unit: m.unit,
-      )).toList();
+
+      _editingBaseTimeKey = widget.reminder!.time;
+      _selectedTimes
+        ..clear()
+        ..add(_parseTimeOfDay(widget.reminder!.time));
+
+      _medicines = widget.reminder!.medicines
+          .map((m) => MedicineFormData(
+                id: m.id,
+                nameController: TextEditingController(text: m.name),
+                doseController: TextEditingController(text: m.dose),
+                unit: m.unit,
+              ))
+          .toList();
 
       _scheduleType = widget.reminder!.schedule;
       _startDate = DateTime(
@@ -54,6 +69,9 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
         _durationDaysController.text = widget.reminder!.durationDays.toString();
       }
     } else {
+      _selectedTimes
+        ..clear()
+        ..add(_selectedTime);
       _medicines = [
         MedicineFormData(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -63,6 +81,26 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
         ),
       ];
     }
+  }
+
+  TimeOfDay _parseTimeOfDay(String time) {
+    final parts = time.split(':');
+    return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+  }
+
+  void _dedupeAndSortTimes() {
+    final seen = <String>{};
+    final next = <TimeOfDay>[];
+    for (final t in _selectedTimes) {
+      final key = _formatTimeKey(t);
+      if (seen.add(key)) {
+        next.add(t);
+      }
+    }
+    next.sort((a, b) => _formatTimeKey(a).compareTo(_formatTimeKey(b)));
+    _selectedTimes
+      ..clear()
+      ..addAll(next);
   }
 
   @override
@@ -78,71 +116,146 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.reminder != null;
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
         title: Text(
           isEditing ? 'Edit Reminder' : 'Add Reminder',
-          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: const Color(0xFF1976D2),
         actions: isEditing
             ? [
                 IconButton(
+                  icon: const Icon(Icons.add_alarm),
+                  onPressed: _addTime,
+                  tooltip: 'Add reminder time',
+                ),
+                IconButton(
                   icon: const Icon(Icons.delete, color: Colors.red),
                   onPressed: _deleteReminder,
+                  tooltip: 'Delete reminder',
                 ),
               ]
-            : null,
+            : [
+                IconButton(
+                  icon: const Icon(Icons.add_alarm),
+                  onPressed: _addTime,
+                  tooltip: 'Add reminder time',
+                ),
+              ],
       ),
       body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _buildTimePicker(),
-              const SizedBox(height: 16),
-              _buildSchedulePicker(),
-              const SizedBox(height: 24),
-              _buildMedicinesList(),
-              const SizedBox(height: 24),
-              _buildAddMedicineButton(),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: _saveReminder,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1976D2),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+        child: AppBackground(
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+              children: [
+                _buildTimePicker(isEditing: isEditing),
+                const SizedBox(height: 16),
+                _buildSchedulePicker(),
+                const SizedBox(height: 16),
+                _buildLockoutPicker(),
+                const SizedBox(height: 24),
+                _buildMedicinesList(),
+                const SizedBox(height: 16),
+                _buildAddMedicineButton(),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _saveReminder,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: scheme.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                    child:
+                        Text(isEditing ? 'Update Reminder' : 'Save Reminder'),
+                  ),
                 ),
-                child: Text(
-                  isEditing ? 'Update Reminder' : 'Save Reminder',
-                  style: const TextStyle(fontSize: 18),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildTimePicker() {
+  Widget _buildTimePicker({required bool isEditing}) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    final times = _selectedTimes.toList()
+      ..sort((a, b) => _formatTimeKey(a).compareTo(_formatTimeKey(b)));
+
     return Card(
-      child: ListTile(
-        leading: const Icon(Icons.access_time, color: Color(0xFF1976D2)),
-        title: const Text(
-          'Reminder Time',
-          style: TextStyle(fontWeight: FontWeight.bold),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.access_time, color: scheme.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    isEditing ? 'Reminder Times' : 'Reminder Times',
+                    style: textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _addTime,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add time'),
+                )
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (times.isEmpty)
+              Text(
+                'Add one or more times',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurface.withValues(alpha: 0.72),
+                ),
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: times.map((t) {
+                      final key = _formatTimeKey(t);
+                      final isBase =
+                          widget.reminder != null && key == _editingBaseTimeKey;
+                      return InputChip(
+                        label: Text(_formatTimeDisplay(t)),
+                        deleteIcon: const Icon(Icons.close, size: 18),
+                        onDeleted: isBase ? null : () => _removeTime(key),
+                        onPressed: () => _editTime(key),
+                        side: BorderSide(
+                            color: scheme.primary.withValues(alpha: 0.16)),
+                        backgroundColor: Colors.white,
+                        labelStyle: textTheme.labelLarge
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Tip: tap a time to edit it',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurface.withValues(alpha: 0.62),
+                    ),
+                  ),
+                ],
+              ),
+          ],
         ),
-        subtitle: Text(_formatTime(_selectedTime)),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: _pickTime,
       ),
     );
   }
@@ -160,11 +273,8 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<ReminderScheduleType>(
-              value: _scheduleType,
-              decoration: const InputDecoration(
-                labelText: 'Reminder runs',
-                border: OutlineInputBorder(),
-              ),
+              initialValue: _scheduleType,
+              decoration: const InputDecoration(labelText: 'Reminder runs'),
               items: const [
                 DropdownMenuItem(
                   value: ReminderScheduleType.dailyForever,
@@ -190,7 +300,8 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
             if (_scheduleType == ReminderScheduleType.untilDate)
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.event, color: Color(0xFF1976D2)),
+                leading: Icon(Icons.event,
+                    color: Theme.of(context).colorScheme.primary),
                 title: const Text('End date'),
                 subtitle: Text(_endDate == null
                     ? 'Tap to choose'
@@ -204,11 +315,11 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Number of days',
                   hintText: 'e.g., 10',
-                  border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,
                 validator: (value) {
-                  if (_scheduleType != ReminderScheduleType.forDays) return null;
+                  if (_scheduleType != ReminderScheduleType.forDays)
+                    return null;
                   final parsed = int.tryParse((value ?? '').trim());
                   if (parsed == null || parsed <= 0) {
                     return 'Enter a valid number of days';
@@ -223,6 +334,135 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildLockoutPicker() {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final lockoutMinutes = ref.watch(lockoutMinutesProvider);
+    final displayDuration = _formatDuration(lockoutMinutes);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.timer_outlined, color: scheme.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Lockout duration',
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Text(
+                  displayDuration,
+                  style: textTheme.labelLarge?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Prevents taking the same medicine again within this time after marking a dose as taken.',
+              style: textTheme.bodySmall?.copyWith(
+                color: scheme.onSurface.withValues(alpha: 0.72),
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('Off'),
+                  selected: lockoutMinutes == 0,
+                  onSelected: (_) {
+                    ref.read(lockoutMinutesProvider.notifier).setMinutes(0);
+                  },
+                  selectedColor: scheme.primary.withValues(alpha: 0.18),
+                  labelStyle: textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: lockoutMinutes == 0 ? scheme.primary : null,
+                  ),
+                  side: BorderSide(
+                    color: scheme.primary
+                        .withValues(alpha: lockoutMinutes == 0 ? 0.35 : 0.16),
+                  ),
+                ),
+                ...AppConstants.lockoutPresetMinutes.map((minutes) {
+                  final selected = lockoutMinutes == minutes;
+                  final hours = minutes ~/ 60;
+                  return ChoiceChip(
+                    label: Text('${hours}h'),
+                    selected: selected,
+                    onSelected: (_) {
+                      ref
+                          .read(lockoutMinutesProvider.notifier)
+                          .setMinutes(minutes);
+                    },
+                    selectedColor: scheme.primary.withValues(alpha: 0.18),
+                    labelStyle: textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: selected ? scheme.primary : null,
+                    ),
+                    side: BorderSide(
+                      color: scheme.primary
+                          .withValues(alpha: selected ? 0.35 : 0.16),
+                    ),
+                  );
+                }),
+                ActionChip(
+                  label: const Text('Custom'),
+                  onPressed: () => _pickCustomLockoutDuration(lockoutMinutes),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(int totalMinutes) {
+    if (totalMinutes <= 0) return 'Off';
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+    if (hours == 0) return '${minutes}m';
+    if (minutes == 0) return '${hours}h';
+    return '${hours}h ${minutes}m';
+  }
+
+  Future<void> _pickCustomLockoutDuration(int currentMinutes) async {
+    final initialMinutes = currentMinutes.clamp(0, 23 * 60 + 59);
+    final initial = TimeOfDay(
+      hour: initialMinutes ~/ 60,
+      minute: initialMinutes % 60,
+    );
+
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initial,
+      helpText: 'Lockout duration',
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+    );
+
+    if (picked == null) return;
+    final minutes = picked.hour * 60 + picked.minute;
+    await ref.read(lockoutMinutesProvider.notifier).setMinutes(minutes);
   }
 
   Future<void> _pickEndDate() async {
@@ -278,7 +518,8 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
                 ),
                 if (_medicines.length > 1)
                   IconButton(
-                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                    icon: const Icon(Icons.remove_circle_outline,
+                        color: Colors.red),
                     onPressed: () => _removeMedicine(index),
                   ),
               ],
@@ -289,7 +530,6 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
               decoration: InputDecoration(
                 labelText: 'Medicine Name',
                 hintText: 'e.g., Aspirin, Vitamin D',
-                border: const OutlineInputBorder(),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
@@ -308,7 +548,6 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
                     decoration: InputDecoration(
                       labelText: 'Dose',
                       hintText: 'e.g., 100',
-                      border: const OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.number,
                     validator: (value) {
@@ -323,13 +562,14 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
                 Expanded(
                   flex: 2,
                   child: DropdownButtonFormField<String>(
-                    value: medicine.unit,
+                    initialValue: medicine.unit,
                     decoration: const InputDecoration(
                       labelText: 'Unit',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                     ),
-                    items: ['mg', 'ml', 'tablet', 'capsule', 'drop'].map((unit) {
+                    items:
+                        ['mg', 'ml', 'tablet', 'capsule', 'drop'].map((unit) {
                       return DropdownMenuItem(value: unit, child: Text(unit));
                     }).toList(),
                     onChanged: (value) {
@@ -353,28 +593,76 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
       icon: const Icon(Icons.add),
       label: const Text('Add Another Medicine'),
       style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFF1976D2),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-      ),
+          padding: const EdgeInsets.symmetric(vertical: 12)),
     );
   }
 
-  String _formatTime(TimeOfDay time) {
+  String _formatTimeKey(TimeOfDay time) {
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
   }
 
-  Future<void> _pickTime() async {
+  String _formatTimeDisplay(TimeOfDay time) {
+    return MaterialLocalizations.of(context).formatTimeOfDay(
+      time,
+      alwaysUse24HourFormat: false,
+    );
+  }
+
+  Future<void> _addTime() async {
+    final initial =
+        _selectedTimes.isNotEmpty ? _selectedTimes.last : _selectedTime;
     final time = await showTimePicker(
       context: context,
-      initialTime: _selectedTime,
+      initialTime: initial,
     );
-    if (time != null) {
-      setState(() {
-        _selectedTime = time;
-      });
-    }
+
+    if (time == null) return;
+
+    final key = _formatTimeKey(time);
+    final existing = _selectedTimes.any((t) => _formatTimeKey(t) == key);
+    if (existing) return;
+
+    setState(() {
+      _selectedTimes.add(time);
+      _dedupeAndSortTimes();
+    });
+  }
+
+  Future<void> _editTime(String formatted) async {
+    final current = _selectedTimes.firstWhere(
+      (t) => _formatTimeKey(t) == formatted,
+      orElse: () => _selectedTime,
+    );
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: current,
+    );
+    if (picked == null) return;
+
+    final newKey = _formatTimeKey(picked);
+    final exists = _selectedTimes.any((t) => _formatTimeKey(t) == newKey);
+    if (exists) return;
+
+    setState(() {
+      final idx =
+          _selectedTimes.indexWhere((t) => _formatTimeKey(t) == formatted);
+      if (idx >= 0) {
+        _selectedTimes[idx] = picked;
+      }
+      _dedupeAndSortTimes();
+
+      if (widget.reminder != null && _editingBaseTimeKey == formatted) {
+        _editingBaseTimeKey = newKey;
+      }
+    });
+  }
+
+  void _removeTime(String formatted) {
+    setState(() {
+      _selectedTimes.removeWhere((t) => _formatTimeKey(t) == formatted);
+    });
   }
 
   void _addMedicine() {
@@ -399,6 +687,13 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
   Future<void> _saveReminder() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_selectedTimes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please add at least one reminder time')),
+      );
+      return;
+    }
+
     if (_medicines.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please add at least one medicine')),
@@ -406,40 +701,120 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
       return;
     }
 
-    final reminderMedicines = _medicines.map((m) => ReminderMedicine(
-      id: m.id,
-      name: m.nameController.text.trim(),
-      dose: m.doseController.text.trim(),
-      unit: m.unit,
-    )).toList();
+    final isEditing = widget.reminder != null;
+    final times = _selectedTimes.map(_formatTimeKey).toList()..sort();
+    final scheduleTypeValue = _scheduleType == ReminderScheduleType.dailyForever
+        ? 0
+        : (_scheduleType == ReminderScheduleType.untilDate ? 1 : 2);
 
-    final reminder = Reminder(
-      id: widget.reminder?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      time: _formatTime(_selectedTime),
-      medicines: reminderMedicines,
-      scheduleType: _scheduleType == ReminderScheduleType.dailyForever
-          ? 0
-          : (_scheduleType == ReminderScheduleType.untilDate ? 1 : 2),
-      startDate: widget.reminder?.startDate ?? _startDate,
-      endDate: _scheduleType == ReminderScheduleType.untilDate ? _endDate : null,
-      durationDays: _scheduleType == ReminderScheduleType.forDays
-          ? int.tryParse(_durationDaysController.text.trim())
-          : null,
-    );
+    List<ReminderMedicine> buildMedicinesFor(
+        Reminder? existing, String reminderId) {
+      final form = _medicines
+          .map((m) => (
+                name: m.nameController.text.trim(),
+                dose: m.doseController.text.trim(),
+                unit: m.unit,
+              ))
+          .toList();
+
+      final existingMeds = existing?.medicines ?? const <ReminderMedicine>[];
+      final result = <ReminderMedicine>[];
+
+      final sharedCount =
+          existingMeds.length < form.length ? existingMeds.length : form.length;
+      for (var i = 0; i < sharedCount; i++) {
+        result.add(existingMeds[i].copyWith(
+          name: form[i].name,
+          dose: form[i].dose,
+          unit: form[i].unit,
+        ));
+      }
+
+      for (var i = sharedCount; i < form.length; i++) {
+        result.add(ReminderMedicine(
+          id: '${reminderId}_med_$i',
+          name: form[i].name,
+          dose: form[i].dose,
+          unit: form[i].unit,
+        ));
+      }
+
+      return result;
+    }
 
     final granted = await NotificationService.requestPermissions();
     if (!granted && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Notifications are disabled. Enable them to receive reminders.'),
+          content: Text(
+              'Notifications are disabled. Enable them to receive reminders.'),
         ),
       );
     }
 
-    if (widget.reminder != null) {
-      await ref.read(remindersProvider.notifier).updateReminder(reminder);
+    if (!isEditing) {
+      final seed = DateTime.now().microsecondsSinceEpoch;
+      final remindersToSave = times.map((timeStr) {
+        final reminderId = 'rem_${seed}_$timeStr';
+        return Reminder(
+          id: reminderId,
+          time: timeStr,
+          medicines: buildMedicinesFor(null, reminderId),
+          scheduleType: scheduleTypeValue,
+          startDate: _startDate,
+          endDate:
+              _scheduleType == ReminderScheduleType.untilDate ? _endDate : null,
+          durationDays: _scheduleType == ReminderScheduleType.forDays
+              ? int.tryParse(_durationDaysController.text.trim())
+              : null,
+        );
+      }).toList();
+
+      await ref.read(remindersProvider.notifier).addReminders(remindersToSave);
     } else {
-      await ref.read(remindersProvider.notifier).addReminder(reminder);
+      final base = widget.reminder!;
+      final baseTimeKey = _editingBaseTimeKey ?? base.time;
+
+      // Update the reminder being edited.
+      final updated = Reminder(
+        id: base.id,
+        time: baseTimeKey,
+        medicines: buildMedicinesFor(base, base.id),
+        scheduleType: scheduleTypeValue,
+        startDate: base.startDate,
+        endDate:
+            _scheduleType == ReminderScheduleType.untilDate ? _endDate : null,
+        durationDays: _scheduleType == ReminderScheduleType.forDays
+            ? int.tryParse(_durationDaysController.text.trim())
+            : null,
+      );
+
+      await ref.read(remindersProvider.notifier).updateReminder(updated);
+
+      // Create additional reminders for any extra times the user added.
+      final extraTimes = times.where((t) => t != baseTimeKey).toList();
+      if (extraTimes.isNotEmpty) {
+        var seed = DateTime.now().microsecondsSinceEpoch;
+        final extras = extraTimes.map((timeStr) {
+          seed += 1;
+          final reminderId = 'rem_${seed}_$timeStr';
+          return Reminder(
+            id: reminderId,
+            time: timeStr,
+            medicines: buildMedicinesFor(null, reminderId),
+            scheduleType: scheduleTypeValue,
+            startDate: base.startDate,
+            endDate: _scheduleType == ReminderScheduleType.untilDate
+                ? _endDate
+                : null,
+            durationDays: _scheduleType == ReminderScheduleType.forDays
+                ? int.tryParse(_durationDaysController.text.trim())
+                : null,
+          );
+        }).toList();
+
+        await ref.read(remindersProvider.notifier).addReminders(extras);
+      }
     }
 
     if (mounted) {
@@ -460,7 +835,10 @@ class _AddReminderScreenState extends ConsumerState<AddReminderScreen> {
           ),
           TextButton(
             onPressed: () async {
-              await ref.read(remindersProvider.notifier).deleteReminder(widget.reminder!.id);
+              final base = widget.reminder!;
+              await ref
+                  .read(remindersProvider.notifier)
+                  .deleteReminder(base.id);
               if (context.mounted) {
                 Navigator.pop(context);
                 Navigator.pop(context);
