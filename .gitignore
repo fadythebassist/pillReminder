@@ -20,6 +20,13 @@ AGENTS.md
 **/*.iml
 .gradle/
 
+# iOS (generated)
+pill_reminder/ios/Pods/
+pill_reminder/ios/.symlinks/
+pill_reminder/ios/Runner.xcworkspace/
+pill_reminder/ios/Flutter/Flutter.framework
+pill_reminder/ios/Flutter/Flutter.podspec
+
 # IDE
 .idea/
 **/.idea/
