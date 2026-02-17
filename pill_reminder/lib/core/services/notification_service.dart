@@ -6,7 +6,8 @@ import '../constants.dart';
 import '../../models/reminder.dart';
 
 class NotificationService {
-  static final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  static final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
 
   static Future<void> init() async {
@@ -21,7 +22,8 @@ class NotificationService {
       // Fallback: keep default tz.local (typically UTC).
     }
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -53,12 +55,12 @@ class NotificationService {
     );
 
     await _notifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(androidChannel);
   }
 
-  static void _onNotificationTapped(NotificationResponse response) {
-  }
+  static void _onNotificationTapped(NotificationResponse response) {}
 
   static Future<bool> requestPermissions() async {
     final android = _notifications.resolvePlatformSpecificImplementation<
@@ -88,7 +90,9 @@ class NotificationService {
     await cancelAllReminders();
 
     for (final reminder in reminders) {
-      final medicineNames = reminder.medicines.map((m) => '${m.dose} ${m.unit} ${m.name}').join(', ');
+      final medicineNames = reminder.medicines
+          .map((m) => '${m.dose} ${m.unit} ${m.name}')
+          .join(', ');
 
       if (reminder.schedule == ReminderScheduleType.dailyForever) {
         final notificationId = _stableId('reminder_${reminder.id}');
@@ -124,7 +128,8 @@ class NotificationService {
 
       for (var dayIndex = 0; dayIndex < daysToSchedule; dayIndex++) {
         final date = start.add(Duration(days: dayIndex));
-        final notificationId = _stableId('reminder_${reminder.id}_${_dateKey(date)}');
+        final notificationId =
+            _stableId('reminder_${reminder.id}_${_dateKey(date)}');
         await _scheduleOneShotForDate(
           notificationId: notificationId,
           title: 'Time for your medicines',
@@ -272,7 +277,8 @@ class NotificationService {
     );
   }
 
-  static Future<void> scheduleQuickTest({Duration delay = const Duration(minutes: 1)}) async {
+  static Future<void> scheduleQuickTest(
+      {Duration delay = const Duration(minutes: 1)}) async {
     await requestPermissions();
     final now = tz.TZDateTime.now(tz.local);
     final scheduledDate = now.add(delay);

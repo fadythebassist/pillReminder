@@ -4,6 +4,7 @@ import '../../core/date_utils.dart';
 import '../../models/reminder.dart';
 import '../../models/medicine_dose.dart';
 import '../../providers/app_providers.dart';
+import '../../widgets/app_background.dart';
 import '../reminders/add_reminder_screen.dart';
 
 class TodayScreen extends ConsumerWidget {
@@ -15,16 +16,10 @@ class TodayScreen extends ConsumerWidget {
     final todayDoses = ref.watch(todayDosesProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
         title: const Text(
           'Pill Reminder',
-          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: const Color(0xFF1976D2),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -32,18 +27,24 @@ class TodayScreen extends ConsumerWidget {
               context,
               MaterialPageRoute(builder: (_) => const AddReminderScreen()),
             ),
+            tooltip: 'Add reminder',
           ),
         ],
       ),
       body: SafeArea(
-        child: reminders.isEmpty
-            ? _buildEmptyState(context)
-            : _buildReminderList(context, ref, reminders, todayDoses),
+        child: AppBackground(
+          child: reminders.isEmpty
+              ? _buildEmptyState(context)
+              : _buildReminderList(context, ref, reminders, todayDoses),
+        ),
       ),
     );
   }
 
   Widget _buildEmptyState(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -53,39 +54,30 @@ class TodayScreen extends ConsumerWidget {
             Icon(
               Icons.medication_outlined,
               size: 80,
-              color: Colors.grey.shade400,
+              color: scheme.primary.withValues(alpha: 0.55),
             ),
             const SizedBox(height: 24),
             Text(
               'No reminders added',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey.shade700,
-              ),
+              style: textTheme.headlineSmall,
             ),
             const SizedBox(height: 12),
             Text(
               'Add your first reminder to start tracking',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
+              style: textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurface.withValues(alpha: 0.72),
+                height: 1.35,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            ElevatedButton.icon(
+            FilledButton.icon(
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const AddReminderScreen()),
               ),
               icon: const Icon(Icons.add),
               label: const Text('Add Reminder'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1976D2),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
             ),
           ],
         ),
@@ -99,6 +91,9 @@ class TodayScreen extends ConsumerWidget {
     List<Reminder> reminders,
     List<MedicineDose> todayDoses,
   ) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -109,18 +104,13 @@ class TodayScreen extends ConsumerWidget {
             children: [
               Text(
                 'Today',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade800,
-                ),
+                style: textTheme.displaySmall,
               ),
               const SizedBox(height: 4),
               Text(
                 AppDateUtils.getTodayDisplayDate(),
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.grey.shade600,
+                style: textTheme.bodyLarge?.copyWith(
+                  color: scheme.onSurface.withValues(alpha: 0.72),
                 ),
               ),
             ],
@@ -146,6 +136,9 @@ class TodayScreen extends ConsumerWidget {
     Reminder reminder,
     List<MedicineDose> todayDoses,
   ) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     final timeParts = reminder.time.split(':');
     final hour = int.parse(timeParts[0]);
     final minute = timeParts[1];
@@ -155,9 +148,6 @@ class TodayScreen extends ConsumerWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -169,12 +159,12 @@ class TodayScreen extends ConsumerWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1976D2).withValues(alpha: 0.1),
+                    color: scheme.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.alarm,
-                    color: Color(0xFF1976D2),
+                    color: scheme.primary,
                     size: 24,
                   ),
                 ),
@@ -185,16 +175,12 @@ class TodayScreen extends ConsumerWidget {
                     children: [
                       Text(
                         displayTime,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: textTheme.titleLarge,
                       ),
                       Text(
                         '${reminder.medicines.length} medicine${reminder.medicines.length > 1 ? 's' : ''}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurface.withValues(alpha: 0.70),
                         ),
                       ),
                     ],
@@ -208,13 +194,16 @@ class TodayScreen extends ConsumerWidget {
                       builder: (_) => AddReminderScreen(reminder: reminder),
                     ),
                   ),
+                  tooltip: 'Edit reminder',
                 ),
               ],
             ),
             const Divider(height: 24),
             ...reminder.medicines.map((medicine) {
               final dose = todayDoses.firstWhere(
-                (d) => d.medicineId == medicine.id && d.scheduledTime == reminder.time,
+                (d) =>
+                    d.medicineId == medicine.id &&
+                    d.scheduledTime == reminder.time,
                 orElse: () => MedicineDose(
                   id: '',
                   medicineId: medicine.id,
@@ -237,13 +226,15 @@ class TodayScreen extends ConsumerWidget {
                       height: 36,
                       decoration: BoxDecoration(
                         color: isTaken
-                            ? const Color(0xFF66BB6A).withValues(alpha: 0.1)
-                            : Colors.grey.shade100,
+                            ? scheme.tertiary.withValues(alpha: 0.12)
+                            : scheme.primary.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
                         isTaken ? Icons.check : Icons.medication,
-                        color: isTaken ? const Color(0xFF66BB6A) : Colors.grey,
+                        color: isTaken
+                            ? scheme.tertiary
+                            : scheme.onSurface.withValues(alpha: 0.55),
                         size: 18,
                       ),
                     ),
@@ -254,67 +245,64 @@ class TodayScreen extends ConsumerWidget {
                         children: [
                           Text(
                             medicine.name,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
+                            style: textTheme.titleMedium,
                           ),
                           Text(
                             '${medicine.dose} ${medicine.unit}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurface.withValues(alpha: 0.70),
                             ),
                           ),
                           if (isTaken && dose.takenAt != null)
                             Text(
                               'Taken at ${AppDateUtils.formatTime(dose.takenAt!)}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF66BB6A),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: scheme.tertiary,
                               ),
                             ),
                         ],
                       ),
                     ),
                     if (!isTaken)
-                      ElevatedButton(
+                      FilledButton(
                         onPressed: () {
                           ref.read(todayDosesProvider.notifier).takeDose(
                                 medicine.id,
                                 reminder.id,
                               );
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1976D2),
-                          foregroundColor: Colors.white,
+                        style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
+                              horizontal: 14, vertical: 10),
+                          minimumSize: const Size(0, 40),
                         ),
                         child: const Text('Take'),
                       ),
-                    if (isTaken && isInLockout)
-                      Text(
-                        'Wait ${_getRemainingLockoutTime(dose.takenAt!, ref)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    if (isTaken && !isInLockout)
-                      TextButton(
-                        onPressed: () {
-                          ref.read(todayDosesProvider.notifier).undoDose(
-                                medicine.id,
-                                reminder.time,
-                              );
-                        },
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.red,
-                        ),
-                        child: const Text('Undo'),
+                    if (isTaken)
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (isInLockout)
+                            Text(
+                              'Wait ${_getRemainingLockoutTime(dose.takenAt!, ref)}',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurface.withValues(alpha: 0.70),
+                              ),
+                            ),
+                          TextButton(
+                            onPressed: () {
+                              ref.read(todayDosesProvider.notifier).undoDose(
+                                    medicine.id,
+                                    reminder.time,
+                                  );
+                            },
+                            style: TextButton.styleFrom(
+                              foregroundColor: scheme.error,
+                            ),
+                            child: const Text('Undo'),
+                          ),
+                        ],
                       ),
                   ],
                 ),
@@ -327,16 +315,16 @@ class TodayScreen extends ConsumerWidget {
   }
 
   String _getRemainingLockoutTime(DateTime takenAt, WidgetRef ref) {
-    final lockoutHours = ref.read(lockoutHoursProvider);
-    final lockoutEnd = takenAt.add(Duration(hours: lockoutHours));
+    final lockoutMinutes = ref.read(lockoutMinutesProvider);
+    final lockoutEnd = takenAt.add(Duration(minutes: lockoutMinutes));
     final now = DateTime.now();
     final remaining = lockoutEnd.difference(now);
-    
+
     if (remaining.isNegative) return '';
-    
+
     final hours = remaining.inHours;
     final minutes = remaining.inMinutes % 60;
-    
+
     if (hours > 0) {
       return '${hours}h ${minutes}m';
     }

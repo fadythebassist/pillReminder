@@ -16,6 +16,9 @@ class SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -23,7 +26,7 @@ class SettingsTile extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              color: Colors.grey.shade200,
+              color: scheme.primary.withValues(alpha: 0.12),
               width: 1,
             ),
           ),
@@ -36,18 +39,15 @@ class SettingsTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: textTheme.titleMedium,
                   ),
                   if (subtitle != null) ...[
                     const SizedBox(height: 4),
                     Text(
                       subtitle!,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurface.withValues(alpha: 0.72),
+                        height: 1.25,
                       ),
                     ),
                   ],

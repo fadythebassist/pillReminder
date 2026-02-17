@@ -5,7 +5,8 @@ import '../core/services/notification_service.dart';
 import '../models/reminder.dart';
 import '../models/medicine_dose.dart';
 
-final remindersProvider = StateNotifierProvider<RemindersNotifier, List<Reminder>>((ref) {
+final remindersProvider =
+    StateNotifierProvider<RemindersNotifier, List<Reminder>>((ref) {
   return RemindersNotifier();
 });
 
@@ -27,6 +28,42 @@ class RemindersNotifier extends StateNotifier<List<Reminder>> {
     await NotificationService.scheduleAllReminders(state);
   }
 
+  Future<void> addReminders(List<Reminder> reminders) async {
+    if (reminders.isEmpty) return;
+    for (final reminder in reminders) {
+      await StorageService.saveReminder(reminder);
+    }
+    state = [...state, ...reminders];
+    await NotificationService.scheduleAllReminders(state);
+  }
+
+  Future<void> applyReminderChanges({
+    List<Reminder> upserts = const [],
+    List<String> deletes = const [],
+  }) async {
+    if (upserts.isEmpty && deletes.isEmpty) return;
+
+    for (final id in deletes) {
+      await StorageService.deleteReminder(id);
+    }
+    for (final reminder in upserts) {
+      await StorageService.saveReminder(reminder);
+    }
+
+    var next = state.where((r) => !deletes.contains(r.id)).toList();
+    for (final reminder in upserts) {
+      final idx = next.indexWhere((r) => r.id == reminder.id);
+      if (idx >= 0) {
+        next[idx] = reminder;
+      } else {
+        next.add(reminder);
+      }
+    }
+    next.sort((a, b) => a.time.compareTo(b.time));
+    state = next;
+    await NotificationService.scheduleAllReminders(state);
+  }
+
   Future<void> updateReminder(Reminder reminder) async {
     await StorageService.saveReminder(reminder);
     state = state.map((r) => r.id == reminder.id ? reminder : r).toList();
@@ -40,7 +77,8 @@ class RemindersNotifier extends StateNotifier<List<Reminder>> {
   }
 }
 
-final todayDosesProvider = StateNotifierProvider<TodayDosesNotifier, List<MedicineDose>>((ref) {
+final todayDosesProvider =
+    StateNotifierProvider<TodayDosesNotifier, List<MedicineDose>>((ref) {
   return TodayDosesNotifier();
 });
 
@@ -59,9 +97,10 @@ class TodayDosesNotifier extends StateNotifier<List<MedicineDose>> {
     if (reminder == null) return;
 
     final time = reminder.time;
-    
-    final existingDose = StorageService.getMedicineDose(medicineId, today, time);
-    
+
+    final existingDose =
+        StorageService.getMedicineDose(medicineId, today, time);
+
     if (existingDose != null && existingDose.isTaken) {
       return;
     }
@@ -73,7 +112,7 @@ class TodayDosesNotifier extends StateNotifier<List<MedicineDose>> {
       scheduledTime: time,
       takenAt: DateTime.now(),
     );
-    
+
     await StorageService.saveMedicineDose(dose);
     state = [...state, dose];
   }
@@ -81,35 +120,37 @@ class TodayDosesNotifier extends StateNotifier<List<MedicineDose>> {
   Future<void> undoDose(String medicineId, String time) async {
     final today = AppDateUtils.getTodayKey();
     final dose = StorageService.getMedicineDose(medicineId, today, time);
-    
+
     if (dose != null) {
       await StorageService.saveMedicineDose(dose.clear());
-      state = state.map((d) => 
-        d.medicineId == medicineId && d.scheduledTime == time 
-          ? d.clear() 
-          : d
-      ).toList();
+      state = state
+          .map((d) => d.medicineId == medicineId && d.scheduledTime == time
+              ? d.clear()
+              : d)
+          .toList();
     }
   }
 }
 
-final lockoutHoursProvider = StateNotifierProvider<LockoutHoursNotifier, int>((ref) {
-  return LockoutHoursNotifier();
+final lockoutMinutesProvider =
+    StateNotifierProvider<LockoutMinutesNotifier, int>((ref) {
+  return LockoutMinutesNotifier();
 });
 
-class LockoutHoursNotifier extends StateNotifier<int> {
-  LockoutHoursNotifier() : super(StorageService.getLockoutHours());
+class LockoutMinutesNotifier extends StateNotifier<int> {
+  LockoutMinutesNotifier() : super(StorageService.getLockoutMinutes());
 
-  Future<void> setHours(int hours) async {
-    await StorageService.setLockoutHours(hours);
-    state = hours;
+  Future<void> setMinutes(int minutes) async {
+    await StorageService.setLockoutMinutes(minutes);
+    state = minutes;
   }
 }
 
-final isInLockoutProvider = Provider.family<bool, ({String medicineId, String time})>((ref, params) {
+final isInLockoutProvider =
+    Provider.family<bool, ({String medicineId, String time})>((ref, params) {
   final doses = ref.watch(todayDosesProvider);
-  final lockoutHours = ref.watch(lockoutHoursProvider);
-  
+  final lockoutMinutes = ref.watch(lockoutMinutesProvider);
+
   final dose = doses.firstWhere(
     (d) => d.medicineId == params.medicineId && d.scheduledTime == params.time,
     orElse: () => MedicineDose(
@@ -119,17 +160,22 @@ final isInLockoutProvider = Provider.family<bool, ({String medicineId, String ti
       scheduledTime: '',
     ),
   );
-  
+
   if (dose.takenAt == null) return false;
-  
-  return AppDateUtils.isInLockout(dose.takenAt, lockoutHours);
+
+  return AppDateUtils.isInLockout(dose.takenAt, lockoutMinutes);
 });
 
 final historyDosesProvider = Provider<List<MedicineDose>>((ref) {
+  // Recompute when today's doses change so History updates live while using
+  // an IndexedStack/tab view.
+  ref.watch(todayDosesProvider);
   return StorageService.getLast30Days();
 });
 
 final adherenceProvider = Provider<int>((ref) {
+  // Keep adherence in sync with take/undo actions.
+  ref.watch(todayDosesProvider);
   return StorageService.calculateAdherence();
 });
 

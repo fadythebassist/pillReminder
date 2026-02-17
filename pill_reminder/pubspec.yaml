@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  google_fonts: ^6.2.1
   flutter_local_notifications: ^18.0.0
   hive: ^2.2.3
   hive_flutter: ^1.1.0
@@ -20,6 +21,7 @@ dependencies:
   share_plus: ^9.0.0
 
 dev_dependencies:
+  flutter_launcher_icons: ^0.14.4
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
@@ -28,3 +30,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  image_path: assets/icon/icon-512.png
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: assets/icon/icon-512.png
