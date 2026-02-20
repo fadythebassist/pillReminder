@@ -114,7 +114,19 @@ class TodayDosesNotifier extends StateNotifier<List<MedicineDose>> {
     );
 
     await StorageService.saveMedicineDose(dose);
-    state = [...state, dose];
+
+    // Replace an existing entry for this medicine+time (e.g. after an undo)
+    // rather than appending a duplicate.
+    final existsInState = state
+        .any((d) => d.medicineId == medicineId && d.scheduledTime == time);
+    if (existsInState) {
+      state = state
+          .map((d) =>
+              d.medicineId == medicineId && d.scheduledTime == time ? dose : d)
+          .toList();
+    } else {
+      state = [...state, dose];
+    }
   }
 
   Future<void> undoDose(String medicineId, String time) async {
